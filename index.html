@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>CodeLab PRO Executor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+--accent:#ffcc00;
+--bg:#020617;
+--panel:#0f172a;
+--border:#1e293b;
+--text:#e5e7eb;
+}
+
+*{box-sizing:border-box;font-family:Segoe UI,system-ui}
+
+body{
+margin:0;
+background:var(--bg);
+color:var(--text);
+height:100vh;
+}
+
+header{
+display:flex;
+flex-wrap:wrap;
+gap:6px;
+align-items:center;
+justify-content:space-between;
+padding:8px;
+border-bottom:1px solid var(--border);
+background:#020617;
+}
+
+header h1{
+margin:0;
+font-size:15px;
+color:var(--accent);
+}
+
+.actions{
+display:flex;
+flex-wrap:wrap;
+gap:5px;
+}
+
+button,select{
+padding:6px 10px;
+border-radius:6px;
+border:none;
+font-weight:600;
+cursor:pointer;
+}
+
+button{
+background:var(--accent);
+color:black;
+}
+
+select{
+background:white;
+color:black;
+}
+
+.container{
+display:grid;
+grid-template-columns:1fr 1fr;
+height:calc(100vh - 55px);
+}
+
+.editors{
+display:grid;
+grid-template-rows:1fr 1fr 1fr;
+gap:6px;
+padding:6px;
+}
+
+.editor{
+background:var(--panel);
+border:1px solid var(--border);
+border-radius:8px;
+display:flex;
+flex-direction:column;
+}
+
+.editor span{
+padding:6px;
+font-size:12px;
+background:#020617;
+color:var(--accent);
+border-bottom:1px solid var(--border);
+}
+
+textarea{
+flex:1;
+background:transparent;
+border:none;
+color:white;
+padding:8px;
+resize:none;
+outline:none;
+font-family:monospace;
+font-size:13px;
+}
+
+.preview{
+padding:6px;
+display:flex;
+flex-direction:column;
+gap:6px;
+}
+
+iframe{
+flex:1;
+border:none;
+background:white;
+border-radius:8px;
+}
+
+.console{
+height:120px;
+background:black;
+color:#22c55e;
+font-family:monospace;
+font-size:12px;
+padding:6px;
+border-radius:6px;
+overflow:auto;
+}
+
+@media(max-width:900px){
+.container{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>CodeLab PRO Executor</h1>
+
+<div class="actions">
+<button onclick="newFile()">Nuevo</button>
+<button onclick="undo()">Undo</button>
+<button onclick="redo()">Redo</button>
+<button onclick="run()">Ejecutar</button>
+<button onclick="clearConsole()">Consola</button>
+<button onclick="saveProject()">Guardar</button>
+<button onclick="loadProject()">Cargar</button>
+
+<select id="tpl">
+<option value="">Plantillas</option>
+<option value="i2">Imagen animada</option>
+<option value="c2">Part¨ªculas</option>
+</select>
+</div>
+</header>
+
+<div class="container">
+<div class="editors">
+<div class="editor"><span>HTML</span><textarea id="html"></textarea></div>
+<div class="editor"><span>CSS</span><textarea id="css"></textarea></div>
+<div class="editor"><span>JavaScript</span><textarea id="js"></textarea></div>
+</div>
+
+<div class="preview">
+<iframe id="output"></iframe>
+<div class="console" id="console"></div>
+</div>
+</div>
+
+<script>
+const h=document.getElementById("html");
+const c=document.getElementById("css");
+const j=document.getElementById("js");
+const o=document.getElementById("output");
+const con=document.getElementById("console");
+const tpl=document.getElementById("tpl");
+
+let history=[],step=-1;
+
+/* ===== HISTORIAL ===== */
+function save(){
+history=history.slice(0,step+1);
+history.push([h.value,c.value,j.value]);
+step++;
+}
+function undo(){if(step>0){step--;load()}}
+function redo(){if(step<history.length-1){step++;load()}}
+function load(){[h.value,c.value,j.value]=history[step];run(false)}
+
+/* ===== CONSOLA ===== */
+function log(m){
+con.innerHTML+=m+"<br>";
+con.scrollTop=con.scrollHeight;
+}
+
+/* ===== EJECUTOR ===== */
+function run(saveState=true){
+if(saveState)save();
+con.innerHTML="";
+o.srcdoc=`
+${h.value}
+<style>${c.value}</style>
+<script>
+console.log=function(m){parent.log(m)}
+try{
+${j.value}
+}catch(e){console.log(e)}
+<\/script>`;
+}
+
+/* ===== ACCIONES ===== */
+function clearConsole(){con.innerHTML=""}
+function newFile(){h.value="";c.value="";j.value="";run()}
+
+/* ===== STORAGE GEYSER SAFE ===== */
+function saveProject(){
+localStorage.setItem("codelab_project",JSON.stringify({
+html:h.value,css:c.value,js:j.value
+}));
+log("Proyecto guardado");
+}
+
+function loadProject(){
+const d=localStorage.getItem("codelab_project");
+if(!d){log("No hay proyecto");return;}
+const p=JSON.parse(d);
+h.value=p.html||"";c.value=p.css||"";j.value=p.js||"";
+run();
+log("Proyecto cargado");
+}
+
+/* ===== PLANTILLAS (FIX GEYSER) ===== */
+tpl.addEventListener("change",()=>{
+if(tpl.value)applyTemplate(tpl.value);
+tpl.selectedIndex=0;
+});
+
+function applyTemplate(t){
+if(t==="i2"){
+h.value="<div class='img'></div>";
+c.value=".img{width:200px;height:200px;background:#ffcc00;margin:auto;animation:spin 2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}";
+j.value="";
+}
+
+if(t==="c2"){
+h.value="<canvas id='cv' width='300' height='300'></canvas>";
+c.value="canvas{background:black;display:block;margin:auto}";
+j.value=`
+const x=cv.getContext('2d');
+let p=[];
+for(let i=0;i<120;i++)
+p.push({x:150,y:150,dx:Math.random()*4-2,dy:Math.random()*4-2});
+setInterval(()=>{
+x.clearRect(0,0,300,300);
+x.fillStyle='lime';
+p.forEach(o=>{
+o.x+=o.dx;
+o.y+=o.dy;
+x.fillRect(o.x,o.y,2,2);
+});
+},30);`;
+}
+run();
+}
+
+/* ===== INIT ===== */
+run();
+</script>
+
+</body>
+</html>
